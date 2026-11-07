@@ -274,6 +274,9 @@ export function SandboxApp(): ReactElement {
                 </button>
               ))}
             </div>
+            <a className="sandbox-params-link" href="#widget-params">
+              Параметры ↓
+            </a>
           </div>
         </div>
       </header>
@@ -315,7 +318,7 @@ export function SandboxApp(): ReactElement {
           )}
         </section>
 
-        <aside className="sandbox-panel">
+        <aside className="sandbox-panel" id="widget-params">
           <h3 className="sandbox-panel__title">Параметры виджета (params)</h3>
 
           <label className="sandbox-field">
