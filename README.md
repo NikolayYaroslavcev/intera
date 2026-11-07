@@ -1,3 +1,7 @@
+> **Решение:** описание архитектуры и принятых решений в [SOLUTION.md](./SOLUTION.md).
+> **Демо песочницы:** https://nikolayyaroslavcev.github.io/intera/
+> Ниже исходный текст задания без изменений.
+
 # Тестовое задание №1 — Subscription Usage Widget
 
 **Проект:** INTERA Core  
