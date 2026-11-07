@@ -1,3 +1,9 @@
+import { toFiniteNumber } from '../platform/to-finite-number';
+import {
+  readBoolean,
+  readEnum,
+  readString,
+} from '../platform/widget-param-readers';
 import {
   WIDGET_ROW_LIMITS,
   WIDGET_SIZES,
@@ -28,6 +34,12 @@ export const MAX_THRESHOLD_PERCENT = 500;
 export const DEFAULT_WARNING_THRESHOLD = 80;
 export const DEFAULT_CRITICAL_THRESHOLD = 100;
 export const DEFAULT_ROW_LIMIT: TWidgetRowLimit = 10;
+export const DEFAULT_DESCRIPTION = 'Subscription Usage';
+export const PERIOD_ALL = 'all';
+export const CUSTOMER_ALL = 'all';
+
+/** `YYYY-MM` with a real month, optionally followed by anything (`-DD`, time, …). */
+const PERIOD_PREFIX_REGEX = /^(\d{4}-(?:0[1-9]|1[0-2]))(?:$|-)/;
 
 export interface ISubscriptionUsageConfig {
   /** Card header title (`params.description`, with fallback to `params.title` or `'Subscription Usage'`). */
@@ -37,13 +49,13 @@ export interface ISubscriptionUsageConfig {
   /** Card width slot (`full` | `half` | `third` | `quarter`). */
   size: TWidgetSize;
   /**
-   * Billing period filter (`'all'` or a `YYYY-MM` / `YYYY-MM-DD` string matched by leading `YYYY-MM`).
-   * Default: `'all'`.
+   * Billing period filter: `'all'` or a normalized `YYYY-MM` prefix
+   * (a `YYYY-MM-DD` param is cut to its leading `YYYY-MM`). Default: `'all'`.
    */
   period: string;
   /** Customer filter (`'all'` or a positive finite `customer_id`). Default: `'all'`. */
   customerId: number | 'all';
-  /** Technology filter (`technology_id[]`). Empty array means all technologies. */
+  /** Technology filter (`technology_id[]`, unique). Empty array means all technologies. */
   technologyIds: number[];
   /** When `true` (default), only rows with `subscription_active === 1` are included. */
   onlyActive: boolean;
@@ -65,6 +77,82 @@ export interface ISubscriptionUsageConfig {
   sortBy: TSortMode;
 }
 
+function readTrimmed(values: readonly unknown[], fallback: string): string {
+  for (const value of values) {
+    const text = readString(value).trim();
+    if (text) {
+      return text;
+    }
+  }
+  return fallback;
+}
+
+/** `'all'` or the leading `YYYY-MM` of a valid period string; anything else is `'all'`. */
+function readPeriod(value: unknown): string {
+  const text = readString(value).trim();
+  const match = PERIOD_PREFIX_REGEX.exec(text);
+  return match ? match[1] : PERIOD_ALL;
+}
+
+/** A positive finite id (numeric strings from YAML are accepted), else `'all'`. */
+function readCustomerId(value: unknown): number | 'all' {
+  const id = toFiniteNumber(value);
+  return id !== null && id > 0 ? id : CUSTOMER_ALL;
+}
+
+/** Unique finite numbers from an array; a non-array is "no filter". */
+function readTechnologyIds(value: unknown): number[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const ids = new Set<number>();
+  for (const item of value) {
+    const id = toFiniteNumber(item);
+    if (id !== null) {
+      ids.add(id);
+    }
+  }
+  return [...ids];
+}
+
+/** Valid limit types in first-seen order without duplicates; empty or invalid means all three. */
+function readLimitTypes(value: unknown): TLimitType[] {
+  if (!Array.isArray(value)) {
+    return [...LIMIT_TYPES];
+  }
+  const types = new Set<TLimitType>();
+  for (const item of value) {
+    if ((LIMIT_TYPES as readonly unknown[]).includes(item)) {
+      types.add(item as TLimitType);
+    }
+  }
+  return types.size > 0 ? [...types] : [...LIMIT_TYPES];
+}
+
+/** A finite number clamped to `[MIN_THRESHOLD_PERCENT, MAX_THRESHOLD_PERCENT]`, else `fallback`. */
+function readThreshold(value: unknown, fallback: number): number {
+  const threshold = toFiniteNumber(value);
+  if (threshold === null) {
+    return fallback;
+  }
+  return Math.min(
+    MAX_THRESHOLD_PERCENT,
+    Math.max(MIN_THRESHOLD_PERCENT, threshold),
+  );
+}
+
+function toRowLimit(value: unknown): TWidgetRowLimit | null {
+  const limit = toFiniteNumber(value);
+  return (WIDGET_ROW_LIMITS as readonly number[]).includes(limit ?? NaN)
+    ? (limit as TWidgetRowLimit)
+    : null;
+}
+
+/** `params.rowLimit` when valid, else legacy `params.maxRows`, else the default. */
+function readRowLimit(rowLimit: unknown, maxRows: unknown): TWidgetRowLimit {
+  return toRowLimit(rowLimit) ?? toRowLimit(maxRows) ?? DEFAULT_ROW_LIMIT;
+}
+
 /**
  * Parses untyped widget `params` into a validated `ISubscriptionUsageConfig` with all defaults applied.
  *
@@ -75,47 +163,44 @@ export interface ISubscriptionUsageConfig {
  *    `warningThreshold >= criticalThreshold`, reset both to `80` and `100`.
  * 4. `limitTypes`: keep only valid `TLimitType` values in unique order; if empty or invalid, fallback to `['data', 'voice', 'money']`.
  * 5. `rowLimit`: read `params.rowLimit` (or legacy `params.maxRows`); if not in `[10, 25, 50, 100]`, fallback to `10`.
+ *
+ * Numeric params (`customerId`, `technologyIds`, thresholds, `rowLimit`) also accept numeric
+ * strings, because hand-edited YAML often quotes numbers. They go through `toFiniteNumber`, so
+ * `null` / `''` never become `0`.
  */
 export function parseSubscriptionUsageParams(
   params: Record<string, unknown> | undefined,
 ): ISubscriptionUsageConfig {
   const p = params ?? {};
 
-  // TODO: Implement full defensive parsing and threshold validation according to the specification.
+  let warningThreshold = readThreshold(
+    p.warningThreshold,
+    DEFAULT_WARNING_THRESHOLD,
+  );
+  let criticalThreshold = readThreshold(
+    p.criticalThreshold,
+    DEFAULT_CRITICAL_THRESHOLD,
+  );
+  if (warningThreshold >= criticalThreshold) {
+    warningThreshold = DEFAULT_WARNING_THRESHOLD;
+    criticalThreshold = DEFAULT_CRITICAL_THRESHOLD;
+  }
+
   return {
-    description:
-      typeof p.description === 'string' && p.description.trim()
-        ? p.description.trim()
-        : typeof p.title === 'string' && p.title.trim()
-          ? p.title.trim()
-          : 'Subscription Usage',
-    subtitle: typeof p.subtitle === 'string' ? p.subtitle.trim() : '',
-    size: WIDGET_SIZES.includes(p.size as TWidgetSize)
-      ? (p.size as TWidgetSize)
-      : 'full',
-    period:
-      typeof p.period === 'string' && p.period.trim()
-        ? p.period.trim()
-        : 'all',
-    customerId:
-      typeof p.customerId === 'number' && Number.isFinite(p.customerId)
-        ? p.customerId
-        : 'all',
-    technologyIds: Array.isArray(p.technologyIds)
-      ? p.technologyIds.filter(
-          (id): id is number => typeof id === 'number' && Number.isFinite(id),
-        )
-      : [],
-    onlyActive: typeof p.onlyActive === 'boolean' ? p.onlyActive : true,
-    limitTypes: [...LIMIT_TYPES],
-    warningThreshold: DEFAULT_WARNING_THRESHOLD,
-    criticalThreshold: DEFAULT_CRITICAL_THRESHOLD,
-    statusFilter: 'all',
-    rowLimit: WIDGET_ROW_LIMITS.includes(p.rowLimit as TWidgetRowLimit)
-      ? (p.rowLimit as TWidgetRowLimit)
-      : DEFAULT_ROW_LIMIT,
-    showSummary: typeof p.showSummary === 'boolean' ? p.showSummary : true,
-    showDetails: typeof p.showDetails === 'boolean' ? p.showDetails : true,
-    sortBy: 'usage_desc',
+    description: readTrimmed([p.description, p.title], DEFAULT_DESCRIPTION),
+    subtitle: readString(p.subtitle).trim(),
+    size: readEnum(p.size, WIDGET_SIZES, 'full'),
+    period: readPeriod(p.period),
+    customerId: readCustomerId(p.customerId),
+    technologyIds: readTechnologyIds(p.technologyIds),
+    onlyActive: readBoolean(p.onlyActive, true),
+    limitTypes: readLimitTypes(p.limitTypes),
+    warningThreshold,
+    criticalThreshold,
+    statusFilter: readEnum(p.statusFilter, STATUS_FILTERS, 'all'),
+    rowLimit: readRowLimit(p.rowLimit, p.maxRows),
+    showSummary: readBoolean(p.showSummary, true),
+    showDetails: readBoolean(p.showDetails, true),
+    sortBy: readEnum(p.sortBy, SORT_MODES, 'usage_desc'),
   };
 }
