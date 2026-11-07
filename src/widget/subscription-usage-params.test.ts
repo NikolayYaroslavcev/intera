@@ -79,7 +79,7 @@ describe('parseSubscriptionUsageParams — scope filters', () => {
 
   it.each([
     [214, 214],
-    ['214', 214],
+    ['214', 'all'], // params are typed by Core; strings are not guessed into numbers
     [0, 'all'],
     [-5, 'all'],
     [Infinity, 'all'],
@@ -91,12 +91,12 @@ describe('parseSubscriptionUsageParams — scope filters', () => {
     expect(parseSubscriptionUsageParams({ customerId: input }).customerId).toBe(expected);
   });
 
-  it('keeps unique finite technology ids, accepting numeric strings', () => {
+  it('keeps unique finite numeric technology ids only', () => {
     expect(
       parseSubscriptionUsageParams({
         technologyIds: [83, '12', 83, null, '', 'x', NaN, Infinity, 16],
       }).technologyIds,
-    ).toEqual([83, 12, 16]);
+    ).toEqual([83, 16]);
   });
 
   it('reads onlyActive as a strict boolean', () => {
@@ -125,12 +125,20 @@ describe('parseSubscriptionUsageParams — limit types', () => {
 });
 
 describe('parseSubscriptionUsageParams — thresholds', () => {
-  it('accepts a valid pair, including numeric strings', () => {
+  it('accepts a valid pair', () => {
+    const config = parseSubscriptionUsageParams({
+      warningThreshold: 70,
+      criticalThreshold: 90,
+    });
+    expect([config.warningThreshold, config.criticalThreshold]).toEqual([70, 90]);
+  });
+
+  it('ignores a threshold that is not a number', () => {
     const config = parseSubscriptionUsageParams({
       warningThreshold: '70',
       criticalThreshold: 90,
     });
-    expect([config.warningThreshold, config.criticalThreshold]).toEqual([70, 90]);
+    expect([config.warningThreshold, config.criticalThreshold]).toEqual([80, 90]);
   });
 
   it('clamps both thresholds to [1, 500]', () => {
@@ -180,7 +188,7 @@ describe('parseSubscriptionUsageParams — enums and rowLimit', () => {
 
   it.each([
     [{ rowLimit: 25 }, 25],
-    [{ rowLimit: '50' }, 50],
+    [{ rowLimit: '50' }, 10],
     [{ maxRows: 100 }, 100],
     [{ rowLimit: 25, maxRows: 100 }, 25],
     [{ rowLimit: 7, maxRows: 50 }, 50],

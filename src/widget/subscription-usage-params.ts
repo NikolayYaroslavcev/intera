@@ -1,4 +1,3 @@
-import { toFiniteNumber } from '../platform/to-finite-number';
 import {
   readBoolean,
   readEnum,
@@ -94,9 +93,17 @@ function readPeriod(value: unknown): string {
   return match ? match[1] : PERIOD_ALL;
 }
 
-/** A positive finite id (numeric strings from YAML are accepted), else `'all'`. */
+/**
+ * Numeric params are read strictly: Core validates params on save, so a string here means a
+ * broken layout, and it falls back to the default instead of being guessed into a number.
+ */
+function readFiniteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/** A positive finite id, else `'all'`. */
 function readCustomerId(value: unknown): number | 'all' {
-  const id = toFiniteNumber(value);
+  const id = readFiniteNumber(value);
   return id !== null && id > 0 ? id : CUSTOMER_ALL;
 }
 
@@ -107,7 +114,7 @@ function readTechnologyIds(value: unknown): number[] {
   }
   const ids = new Set<number>();
   for (const item of value) {
-    const id = toFiniteNumber(item);
+    const id = readFiniteNumber(item);
     if (id !== null) {
       ids.add(id);
     }
@@ -131,7 +138,7 @@ function readLimitTypes(value: unknown): TLimitType[] {
 
 /** A finite number clamped to `[MIN_THRESHOLD_PERCENT, MAX_THRESHOLD_PERCENT]`, else `fallback`. */
 function readThreshold(value: unknown, fallback: number): number {
-  const threshold = toFiniteNumber(value);
+  const threshold = readFiniteNumber(value);
   if (threshold === null) {
     return fallback;
   }
@@ -142,7 +149,7 @@ function readThreshold(value: unknown, fallback: number): number {
 }
 
 function toRowLimit(value: unknown): TWidgetRowLimit | null {
-  const limit = toFiniteNumber(value);
+  const limit = readFiniteNumber(value);
   return (WIDGET_ROW_LIMITS as readonly number[]).includes(limit ?? NaN)
     ? (limit as TWidgetRowLimit)
     : null;
@@ -163,10 +170,6 @@ function readRowLimit(rowLimit: unknown, maxRows: unknown): TWidgetRowLimit {
  *    `warningThreshold >= criticalThreshold`, reset both to `80` and `100`.
  * 4. `limitTypes`: keep only valid `TLimitType` values in unique order; if empty or invalid, fallback to `['data', 'voice', 'money']`.
  * 5. `rowLimit`: read `params.rowLimit` (or legacy `params.maxRows`); if not in `[10, 25, 50, 100]`, fallback to `10`.
- *
- * Numeric params (`customerId`, `technologyIds`, thresholds, `rowLimit`) also accept numeric
- * strings, because hand-edited YAML often quotes numbers. They go through `toFiniteNumber`, so
- * `null` / `''` never become `0`.
  */
 export function parseSubscriptionUsageParams(
   params: Record<string, unknown> | undefined,
