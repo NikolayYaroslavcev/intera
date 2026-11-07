@@ -5,15 +5,16 @@
 }
 
 .sandbox-topbar {
-  height: 52px;
+  min-height: 52px;
   background: var(--nav-bg);
   color: var(--nav-text);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-5);
+  padding: var(--space-2) var(--space-5);
   border-bottom: 1px solid var(--nav-border);
-  gap: var(--space-4);
+  gap: var(--space-2) var(--space-4);
 }
 
 .sandbox-brand {
@@ -82,6 +83,28 @@
 .sandbox-seg__btn--active {
   background: var(--accent);
   color: #ffffff;
+}
+
+@media (max-width: 640px) {
+  .sandbox-topbar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .sandbox-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .sandbox-toolbar__label {
+    flex: 0 0 84px;
+  }
+
+  .sandbox-seg {
+    flex-wrap: wrap;
+  }
 }
 
 .sandbox-body {
