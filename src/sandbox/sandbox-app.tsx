@@ -327,40 +327,38 @@ export function SandboxApp(): ReactElement {
             />
           </label>
 
-          <div className="sandbox-row-2">
-            <label className="sandbox-field">
-              <span className="sandbox-field__label">Период (period)</span>
-              <select
-                className="sandbox-select"
-                value={period}
-                onChange={(e) => setPeriod(e.target.value)}
-              >
-                <option value="all">all (все периоды)</option>
-                <option value="2026-10">2026-10 (Октябрь)</option>
-                <option value="2026-09">2026-09 (Сентябрь)</option>
-              </select>
-            </label>
+          <label className="sandbox-field">
+            <span className="sandbox-field__label">Период (period)</span>
+            <select
+              className="sandbox-select"
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+            >
+              <option value="all">all (все периоды)</option>
+              <option value="2026-10">2026-10 (Октябрь)</option>
+              <option value="2026-09">2026-09 (Сентябрь)</option>
+            </select>
+          </label>
 
-            <label className="sandbox-field">
-              <span className="sandbox-field__label">Клиент (customerId)</span>
-              <select
-                className="sandbox-select"
-                value={String(customerId)}
-                onChange={(e) =>
-                  setCustomerId(
-                    e.target.value === 'all' ? 'all' : Number(e.target.value),
-                  )
-                }
-              >
-                <option value="all">all (все)</option>
-                {customers.map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {name} (#{id})
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label className="sandbox-field">
+            <span className="sandbox-field__label">Клиент (customerId)</span>
+            <select
+              className="sandbox-select"
+              value={String(customerId)}
+              onChange={(e) =>
+                setCustomerId(
+                  e.target.value === 'all' ? 'all' : Number(e.target.value),
+                )
+              }
+            >
+              <option value="all">all (все)</option>
+              {customers.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name} (#{id})
+                </option>
+              ))}
+            </select>
+          </label>
 
           <div className="sandbox-field">
             <span className="sandbox-field__label">
