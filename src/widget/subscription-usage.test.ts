@@ -31,8 +31,12 @@ describe('computeSubscriptionUsage', () => {
   it('excludes inactive subscriptions by default (onlyActive = true)', () => {
     const config = parseSubscriptionUsageParams({ period: 'all' });
     const result = computeSubscriptionUsage(rows, config);
-    // 20 rows total in mock-subscriptions.json, 1 has subscription_active = 0
-    expect(result.summary.total).toBe(19);
+    // The fixture holds 22 rows (18 for 2026-10, 3 for 2026-09 and 1 row with
+    // subscription_active = 0), not 20 as this test originally assumed. The
+    // original expectation of 19 matched neither the data nor the spec, so it
+    // is 22 - 1 = 21 now. See SOLUTION.md, "Fixture vs. starter test".
+    expect(rows).toHaveLength(22);
+    expect(result.summary.total).toBe(21);
   });
 
   it('prioritizes GB over MB when allowance_gb > 0 and does not double-count', () => {
